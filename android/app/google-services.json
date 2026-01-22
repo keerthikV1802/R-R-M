@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "744031013329",
+    "project_id": "r-r-m-da310",
+    "storage_bucket": "r-r-m-da310.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:744031013329:android:a2451d7111ff69db6a78f0",
+        "android_client_info": {
+          "package_name": "com.example.restaurent_management"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "744031013329-1f7r71h36fh7gm8nnenui6jfg14t5nt1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.restaurent_management",
+            "certificate_hash": "085a363baee86e5407418c7905362bdec622b84b"
+          }
+        },
+        {
+          "client_id": "744031013329-7tfder7tma1dajpk6qqstgpbug92j41k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAp8pWkDVn31-jHx7Yo-OkzEP5fJzU8jfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "744031013329-7tfder7tma1dajpk6qqstgpbug92j41k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
