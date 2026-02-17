@@ -15,7 +15,7 @@ class _CustomizeStatusWithLabelScreenState
   late String org;
   late String uid;
 
-  Map<String, List<String>> data = {};
+  Map<String, List<Map<String, dynamic>>> data = {};
 
   bool loading = true;
 
@@ -51,9 +51,17 @@ class _CustomizeStatusWithLabelScreenState
       });
     }
 
-    data = Map<String, List<String>>.from(
+    data = Map<String, List<Map<String, dynamic>>>.from(
       doc.data()!.map(
-        (key, value) => MapEntry(key, List<String>.from(value)),
+        (key, value) {
+          List<Map<String, dynamic>> list = List<dynamic>.from(value).map((e) {
+            if (e is String) {
+              return {"name": e, "hasDesc": false, "isMandatory": false};
+            }
+            return Map<String, dynamic>.from(e as Map);
+          }).toList();
+          return MapEntry(key, list);
+        },
       ),
     );
 
@@ -105,7 +113,9 @@ class _CustomizeStatusWithLabelScreenState
                   if (name.isEmpty) return;
 
                   if (!data.containsKey(name)) {
-                    data[name] = ["default"];
+                    data[name] = [
+                      {"name": "default", "hasDesc": false, "isMandatory": false}
+                    ];
                     await save();
                     setState(() {});
                   }
@@ -126,34 +136,160 @@ class _CustomizeStatusWithLabelScreenState
   // ---------------------------------------------------------------------
   void addItem(String category) {
     final controller = TextEditingController();
+    bool hasDesc = false;
+    bool isMandatory = false;
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Add new label in $category"),
-              const SizedBox(height: 12),
-              TextField(controller: controller),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () async {
-                  if (controller.text.trim().isEmpty) return;
+        return StatefulBuilder(builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Add new label in $category",
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: "Label Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text("Requires Description Field"),
+                  subtitle: const Text("Show extra textfield when selected"),
+                  value: hasDesc,
+                  onChanged: (v) {
+                    setModalState(() {
+                      hasDesc = v;
+                      if (!v) isMandatory = false;
+                    });
+                  },
+                ),
+                if (hasDesc)
+                  SwitchListTile(
+                    title: const Text("Is Mandatory"),
+                    subtitle: const Text("User cannot save lead without description"),
+                    value: isMandatory,
+                    onChanged: (v) {
+                      setModalState(() => isMandatory = v);
+                    },
+                  ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (controller.text.trim().isEmpty) return;
 
-                  data[category]!.add(controller.text.trim());
+                    data[category]!.add({
+                      "name": controller.text.trim(),
+                      "hasDesc": hasDesc,
+                      "isMandatory": isMandatory,
+                    });
 
-                  await save();
-                  Navigator.pop(context);
-                  setState(() {});
-                },
-                child: const Text("ADD LABEL"),
-              ),
-            ],
-          ),
-        );
+                    await save();
+                    Navigator.pop(context);
+                    setState(() {});
+                  },
+                  child: const Text("ADD LABEL"),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // EDIT LABEL
+  // ---------------------------------------------------------------------
+  void editItem(String category, Map<String, dynamic> item) {
+    final controller = TextEditingController(text: item['name']);
+    bool hasDesc = item['hasDesc'] ?? false;
+    bool isMandatory = item['isMandatory'] ?? false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) {
+        return StatefulBuilder(builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Edit ${item['name']}",
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: "Label Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text("Requires Description Field"),
+                  subtitle: const Text("Show extra textfield when selected"),
+                  value: hasDesc,
+                  onChanged: (v) {
+                    setModalState(() {
+                      hasDesc = v;
+                      if (!v) isMandatory = false;
+                    });
+                  },
+                ),
+                if (hasDesc)
+                  SwitchListTile(
+                    title: const Text("Is Mandatory"),
+                    subtitle: const Text("User cannot save lead without description"),
+                    value: isMandatory,
+                    onChanged: (v) {
+                      setModalState(() => isMandatory = v);
+                    },
+                  ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (controller.text.trim().isEmpty) return;
+
+                    // Update the item in place
+                    final index = data[category]!.indexOf(item);
+                    if (index != -1) {
+                      data[category]![index] = {
+                        "name": controller.text.trim(),
+                        "hasDesc": hasDesc,
+                        "isMandatory": isMandatory,
+                      };
+                      await save();
+                      setState(() {});
+                    }
+                    Navigator.pop(context);
+                  },
+                  child: const Text("SAVE CHANGES"),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        });
       },
     );
   }
@@ -229,14 +365,28 @@ class _CustomizeStatusWithLabelScreenState
               children: data[title]!
                   .map(
                     (item) => ListTile(
-                      title: Text(item),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () async {
-                          data[title]!.remove(item);
-                          await save();
-                          setState(() {});
-                        },
+                      title: Text(item['name'] ?? ''),
+                      subtitle: item['hasDesc'] == true
+                          ? Text(
+                              "Requires Desc ${item['isMandatory'] == true ? '(Mandatory)' : '(Optional)'}",
+                              style: const TextStyle(fontSize: 12))
+                          : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => editItem(title, item),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              data[title]!.remove(item);
+                              await save();
+                              setState(() {});
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   )

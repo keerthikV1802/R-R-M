@@ -5,6 +5,7 @@ import 'package:restaurent_management/followup_calendar_screen.dart';
 import 'package:restaurent_management/manager_list_screen.dart';
 import 'package:restaurent_management/screens/salesman/RestaurantListScreen.dart';
 import 'package:restaurent_management/screens/salesman/more/general_settings_screen.dart';
+import 'package:restaurent_management/screens/admin/admin_more_options_screen.dart';
 
 import 'package:restaurent_management/services/auth_service.dart';
 import 'package:restaurent_management/screens/authentication/login_screen.dart';
@@ -33,13 +34,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final GlobalKey<RestaurantPaginatedListScreenState> _leadsPageKey =
       GlobalKey<RestaurantPaginatedListScreenState>();
 
+  final GlobalKey<FollowUpCalendarScreenState> _calendarPageKey =
+      GlobalKey<FollowUpCalendarScreenState>();
+
   List<Widget> get _pages => [
         // Use the StatefulWidget here, not the State class:
         RestaurantPaginatedListScreen(key: _leadsPageKey),
         const ManagerListScreen(),
         const Center(child: Text("SOON.....")),
-        const FollowUpCalendarScreen(),
-        const GeneralSettingsScreen(),
+        FollowUpCalendarScreen(stateKey: _calendarPageKey),
+        const AdminMoreOptionsScreen(),
       ];
 
   void _onItemTapped(int index) {
@@ -165,6 +169,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: Text(_titles[_selectedIndex]),
         centerTitle: true,
         actions: [
+          if (_selectedIndex == 3) // Calender tab
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh Calendar',
+              onPressed: () {
+                _calendarPageKey.currentState?.refresh();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => _logout(context),

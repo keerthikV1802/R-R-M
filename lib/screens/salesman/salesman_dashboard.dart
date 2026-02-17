@@ -20,6 +20,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   // Add GlobalKey to access the list screen
   final GlobalKey<RestaurantPaginatedListScreenState> _leadsPageKey = 
       GlobalKey<RestaurantPaginatedListScreenState>();
+  
+  final GlobalKey<FollowUpCalendarScreenState> _calendarPageKey = 
+      GlobalKey<FollowUpCalendarScreenState>();
     
   final List<String> _titles = [
     "Leads",
@@ -31,7 +34,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   List<Widget> get _pages => [
     RestaurantPaginatedListScreen(key: _leadsPageKey),
     const Center(child: Text("Content Page")),
-    const FollowUpCalendarScreen(),
+    FollowUpCalendarScreen(stateKey: _calendarPageKey),
     const MoreOptionsScreen(),
   ];
 
@@ -153,6 +156,14 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         title: Text(_titles[_selectedIndex]),
         centerTitle: true,
         actions: [
+          if (_selectedIndex == 2) // Calender tab
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh Calendar',
+              onPressed: () {
+                _calendarPageKey.currentState?.refresh();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',

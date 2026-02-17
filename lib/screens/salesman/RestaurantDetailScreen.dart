@@ -23,7 +23,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     {'name': 'contigency', 'color': Colors.orange},
   ];
 
-  Map<String, List<String>> statusWithLabels = {};
+  Map<String, List<Map<String, dynamic>>> statusWithLabels = {};
   Map<String, List<String>> statusLabelMap = {
     "Sales": ["default"],
     "After Sales": ["default"],
@@ -92,18 +92,22 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     final customDoc = await customRef.get();
     if (!customDoc.exists) {
       await customRef.set({
-        'sales': ["default", "hot1", "cold1", "warm1"],
-        'aftersales': ["default", "hot2", "cold2", "warm2"],
-        'contigency': ["default", "hot3", "cold3", "warm3"],
+        'Sales': ["default"],
+        'After Sales': ["default"],
+        'Contingency': ["default"],
       });
     }
 
     final data = (await customRef.get()).data() ?? {};
-    statusWithLabels = {
-      'Sales': List<String>.from(data['sales'] ?? []),
-      'After Sales': List<String>.from(data['aftersales'] ?? []),
-      'Contingency': List<String>.from(data['contigency'] ?? []),
-    };
+    statusWithLabels = data.map((key, value) {
+      List<Map<String, dynamic>> list = List<dynamic>.from(value).map((e) {
+        if (e is String) {
+          return {"name": e, "hasDesc": false, "isMandatory": false};
+        }
+        return Map<String, dynamic>.from(e as Map);
+      }).toList();
+      return MapEntry(key, list);
+    });
     setState(() {});
   }
 
@@ -177,6 +181,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   void _showStatusWithLabelSelector(String currentStatus, String currentLabel) {
     String selectedStatus = currentStatus;
     String selectedLabel = currentLabel;
+    final descC = TextEditingController(text: restaurantData?['labelDescription'] ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -217,40 +222,65 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   ),
                   const SizedBox(height: 20),
                   // LABEL dropdown (safe)
-                  Builder(
+                   Builder(
                     builder: (context) {
-                      List<String> options = statusWithLabels[selectedStatus] ?? [];
+                      List<Map<String, dynamic>> options = statusWithLabels[selectedStatus] ?? [];
                       if (options.isEmpty) {
-                        options = ["default"];
-                        statusWithLabels[selectedStatus] = options;
+                        options = [{"name": "default", "hasDesc": false, "isMandatory": false}];
                       }
-                      if (selectedLabel.isEmpty || !options.contains(selectedLabel)) {
-                        selectedLabel = options.first;
-                      }
+                      
+                      final currentConfig = options.firstWhere(
+                        (e) => e['name'] == selectedLabel,
+                        orElse: () => {"name": "default", "hasDesc": false, "isMandatory": false},
+                      );
 
-                      return DropdownButtonFormField<String>(
-                        value: selectedLabel,
-                        decoration: const InputDecoration(
-                          labelText: "Label",
-                          border: OutlineInputBorder(),
-                        ),
-                        items: options.map((l) => DropdownMenuItem<String>(
-                              value: l,
-                              child: Text(l),
-                            )).toList(),
-                        onChanged: (v) {
-                          setStateModal(() {
-                            selectedLabel = v ?? options.first;
-                          });
-                        },
+                      return Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: selectedLabel,
+                            decoration: const InputDecoration(
+                              labelText: "Label",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: options.map((l) => DropdownMenuItem<String>(
+                                  value: l['name'].toString(),
+                                  child: Text(l['name'].toString()),
+                                )).toList(),
+                            onChanged: (v) {
+                              setStateModal(() {
+                                selectedLabel = v ?? options.first['name'];
+                              });
+                            },
+                          ),
+                          if (currentConfig['hasDesc'] == true) ...[
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: descC,
+                              decoration: InputDecoration(
+                                labelText: "Description for $selectedLabel",
+                                border: const OutlineInputBorder(),
+                                hintText: currentConfig['isMandatory'] == true ? "Required" : "Optional",
+                              ),
+                            ),
+                          ],
+                        ],
                       );
                     },
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () async {
+                      List<Map<String, dynamic>> options = statusWithLabels[selectedStatus] ?? [];
+                      final config = options.firstWhere((e) => e['name'] == selectedLabel, orElse: () => {});
+                      
+                      if (config['hasDesc'] == true && config['isMandatory'] == true && descC.text.trim().isEmpty) {
+                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Description is mandatory for this label")));
+                         return;
+                      }
+
                       await _updateField('status', selectedStatus);
                       await _updateField('label', selectedLabel);
+                      await _updateField('labelDescription', descC.text.trim());
                       Navigator.pop(context);
                     },
                     child: const Text("Save"),
@@ -265,34 +295,58 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   }
 
   Future<Map<String, String?>> _fetchCreatorAndManagerNames(String? createdByUid, String restaurantOrg) async {
-  // explicitly type values as String? (nullable)
-  final Map<String, String?> result = {
-    'creatorName': null,
-    'creatorRole': null,
-    'managerName': null,
-  };
+    final Map<String, String?> result = {
+      'creatorName': null,
+      'creatorRole': null,
+      'managerName': null,
+    };
 
-  if (createdByUid == null || createdByUid.isEmpty) return result;
+    if (createdByUid == null || createdByUid.isEmpty) return result;
 
-  try {
-    // try global users first
-    final g = await FirebaseFirestore.instance.collection('users').doc(createdByUid).get();
-    if (g.exists) {
-      final gd = g.data()!;
-      result['creatorName'] = (gd['name'] ?? '').toString();
-      result['creatorRole'] = (gd['role'] ?? '').toString();
+    try {
+      final g = await FirebaseFirestore.instance.collection('users').doc(createdByUid).get();
+      if (g.exists) {
+        final gd = g.data()!;
+        result['creatorName'] = (gd['name'] ?? '').toString();
+        result['creatorRole'] = (gd['role'] ?? '').toString();
 
-      // check assignedTo under organisation users
-      final orgUser = await FirebaseFirestore.instance
+        final orgUser = await FirebaseFirestore.instance
+            .collection('organisations')
+            .doc(restaurantOrg)
+            .collection('users')
+            .doc(createdByUid)
+            .get();
+
+        if (orgUser.exists) {
+          final od = orgUser.data()!;
+          final assignedTo = (od['assignedTo'] ?? '').toString();
+          if (assignedTo.isNotEmpty) {
+            final m = await FirebaseFirestore.instance
+                .collection('organisations')
+                .doc(restaurantOrg)
+                .collection('users')
+                .doc(assignedTo)
+                .get();
+            if (m.exists) {
+              result['managerName'] = (m.data()?['name'] ?? '').toString();
+            }
+          }
+        }
+        return result;
+      }
+
+      final u = await FirebaseFirestore.instance
           .collection('organisations')
           .doc(restaurantOrg)
           .collection('users')
           .doc(createdByUid)
           .get();
 
-      if (orgUser.exists) {
-        final od = orgUser.data()!;
-        final assignedTo = (od['assignedTo'] ?? '').toString();
+      if (u.exists) {
+        final ud = u.data()!;
+        result['creatorName'] = (ud['name'] ?? '').toString();
+        result['creatorRole'] = (ud['role'] ?? '').toString();
+        final assignedTo = (ud['assignedTo'] ?? '').toString();
         if (assignedTo.isNotEmpty) {
           final m = await FirebaseFirestore.instance
               .collection('organisations')
@@ -300,51 +354,21 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               .collection('users')
               .doc(assignedTo)
               .get();
-          if (m.exists) {
-            result['managerName'] = (m.data()?['name'] ?? '').toString();
-          }
+          if (m.exists) result['managerName'] = (m.data()?['name'] ?? '').toString();
         }
       }
-      return result;
+    } catch (e) {
+      debugPrint('fetchCreatorAndManagerNames error: $e');
     }
 
-    // fallback: try organisation user doc
-    final u = await FirebaseFirestore.instance
-        .collection('organisations')
-        .doc(restaurantOrg)
-        .collection('users')
-        .doc(createdByUid)
-        .get();
-
-    if (u.exists) {
-      final ud = u.data()!;
-      result['creatorName'] = (ud['name'] ?? '').toString();
-      result['creatorRole'] = (ud['role'] ?? '').toString();
-      final assignedTo = (ud['assignedTo'] ?? '').toString();
-      if (assignedTo.isNotEmpty) {
-        final m = await FirebaseFirestore.instance
-            .collection('organisations')
-            .doc(restaurantOrg)
-            .collection('users')
-            .doc(assignedTo)
-            .get();
-        if (m.exists) result['managerName'] = (m.data()?['name'] ?? '').toString();
-      }
-    }
-  } catch (e) {
-    debugPrint('fetchCreatorAndManagerNames error: $e');
+    return result;
   }
-
-  return result;
-}
-
 
   Widget _timelineTab(DateTime? createdAt, Map<String, String?>? creatorInfo) {
     final createdText = createdAt != null
         ? DateFormat('MMM d, yyyy  hh:mm a').format(createdAt)
         : "Unknown";
 
-    // default widget shows created on
     final children = <Widget>[
       ListTile(
         leading: const Icon(Icons.calendar_today, color: Colors.green),
@@ -353,10 +377,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
       ),
     ];
 
-    // Decide what extra info to show based on currentUserRole
-    // level3 -> only created date (no extra)
-    // level2 -> show salesperson name (creator) if exists
-    // level1 -> show salesperson + manager names
     if (currentUserRole == 'level2' || currentUserRole == 'level1') {
       final creatorName = creatorInfo?['creatorName'];
       if (creatorName != null && creatorName.isNotEmpty) {
@@ -409,21 +429,18 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
           final labels = (data['label'] ?? ['Empty']) is List
               ? List<String>.from(data['label'])
               : [data['label'].toString()];
+          final labelDescription = (data['labelDescription'] ?? '').toString();
           final createdAt = (data['createdAt'] is Timestamp) ? (data['createdAt'] as Timestamp).toDate() : null;
           final createdByUid = (data['createdBy'] ?? '').toString();
           final restaurantOrg = (data['org'] ?? currentUserOrg).toString();
 
-          // Read fields for Info tab
           final clientName = (data['clientName'] ?? '').toString();
           final phone = (data['phone'] ?? '').toString();
           final email = (data['email'] ?? '').toString();
           final address = (data['address'] ?? '').toString();
           final leadDate = (data['leadDate'] is Timestamp) ? (data['leadDate'] as Timestamp).toDate() : null;
-          
-          // NEW: Read estimated budget
           final estimatedBudget = (data['estimatedBudget'] ?? '').toString();
 
-          // load creator/manager info via FutureBuilder
           return FutureBuilder<Map<String, String?>>(
             future: _fetchCreatorAndManagerNames(createdByUid.isEmpty ? null : createdByUid, restaurantOrg),
             builder: (context, creatorSnap) {
@@ -434,7 +451,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -450,7 +466,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                                   color: Color(0xFF0A2342),
                                 ),
                               ),
-                              // NEW: Display estimated budget under the name
                               if (estimatedBudget.isNotEmpty) ...[
                                 const SizedBox(height: 6),
                                 Row(
@@ -475,8 +490,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // Combined Status + Label editor (single chip)
                     Row(
                       children: [
                         InkWell(
@@ -497,10 +510,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 34),
-
-                    // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
@@ -511,15 +521,13 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                         _ActionButton(icon: Icons.description, color: Colors.grey),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Tabs: timeline uses creatorInfo to show names depending on currentUserRole
                     DefaultTabController(
-                      length: 4,
+                      length: 5,
                       child: Column(
                         children: [
                           const TabBar(
+                            isScrollable: true,
                             labelColor: Colors.blueAccent,
                             unselectedLabelColor: Colors.grey,
                             indicatorColor: Colors.blueAccent,
@@ -528,16 +536,16 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                               Tab(text: "Task"),
                               Tab(text: "Notes"),
                               Tab(text: "Info"),
+                              Tab(text: "Follow-ups"),
                             ],
                           ),
                           SizedBox(
-                            height: 250,
+                            height: 350,
                             child: TabBarView(
                               children: [
                                 _timelineTab(createdAt, creatorInfo),
                                 const Center(child: Text("No tasks yet")),
                                 const Center(child: Text("No notes yet")),
-                                // Info tab: show details including client name
                                 Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: ListView(
@@ -578,11 +586,18 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                                           title: const Text("Estimated Budget"),
                                           subtitle: Text(estimatedBudget),
                                         ),
-                                      if (clientName.isEmpty && phone.isEmpty && email.isEmpty && address.isEmpty && leadDate == null && estimatedBudget.isEmpty)
+                                      if (labelDescription.isNotEmpty)
+                                        ListTile(
+                                          leading: const Icon(Icons.label_important_outline, color: Colors.blueGrey),
+                                          title: const Text("Label Description"),
+                                          subtitle: Text(labelDescription),
+                                        ),
+                                      if (clientName.isEmpty && phone.isEmpty && email.isEmpty && address.isEmpty && leadDate == null && estimatedBudget.isEmpty && labelDescription.isEmpty)
                                         const Center(child: Text("No additional info")),
                                     ],
                                   ),
                                 ),
+                                _followUpsTab(name),
                               ],
                             ),
                           ),
@@ -598,9 +613,180 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
       ),
     );
   }
+
+  Widget _followUpsTab(String restaurantName) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton.icon(
+            onPressed: () => _showAddFollowUpDialog(restaurantName),
+            icon: const Icon(Icons.add),
+            label: const Text("Add Follow-up"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('followups')
+                .where('restaurantId', isEqualTo: widget.restaurantId)
+                .orderBy('followUpDate', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text("No follow-ups found"));
+              }
+
+              final docs = snapshot.data!.docs;
+              return ListView.builder(
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final d = docs[index].data() as Map<String, dynamic>;
+                  final date = (d['followUpDate'] as Timestamp).toDate();
+                  final desc = d['description'] ?? '';
+                  final status = d['status'] ?? 'pending';
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: ListTile(
+                      leading: Icon(
+                        status == 'completed' ? Icons.check_circle : Icons.schedule,
+                        color: status == 'completed' ? Colors.green : Colors.orange,
+                      ),
+                      title: Text(DateFormat('MMM d, yyyy  hh:mm a').format(date)),
+                      subtitle: desc.isNotEmpty ? Text(desc) : null,
+                      trailing: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: status == 'completed' ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showAddFollowUpDialog(String restaurantName) async {
+    final descriptionController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Follow-up for $restaurantName'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Enter follow-up notes',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      title: const Text('Date'),
+                      subtitle: Text(DateFormat.yMMMd().format(selectedDate)),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now().subtract(const Duration(days: 0)),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setState(() => selectedDate = picked);
+                        }
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('Time'),
+                      subtitle: Text(selectedTime.format(context)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime,
+                        );
+                        if (picked != null) {
+                          setState(() => selectedTime = picked);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final uid = FirebaseAuth.instance.currentUser?.uid;
+                    if (uid == null) return;
+
+                    final followUpDateTime = DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    );
+
+                    await FirebaseFirestore.instance.collection('followups').add({
+                      'restaurantId': widget.restaurantId,
+                      'restaurantName': restaurantName,
+                      'description': descriptionController.text.trim(),
+                      'followUpDate': Timestamp.fromDate(followUpDateTime),
+                      'org': currentUserOrg,
+                      'createdBy': uid,
+                      'createdAt': FieldValue.serverTimestamp(),
+                      'status': 'pending',
+                    });
+
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Follow-up added successfully!')),
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-// Action button widget unchanged
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final Color color;

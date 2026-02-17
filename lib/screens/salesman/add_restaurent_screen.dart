@@ -1,4 +1,4 @@
-// add_restaurant_screen.dart
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +21,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   final TextEditingController _followUpDescC = TextEditingController();
   final TextEditingController _clientNameC = TextEditingController();
   final TextEditingController _budgetC = TextEditingController(); // NEW: budget controller
+  final TextEditingController _labelDescC = TextEditingController(); // NEW: label description controller
 
   DateTime? _selectedDate;
   DateTime? _followUpDate;
@@ -29,8 +30,9 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   String? _error;
   bool _addFollowUp = false;
 
-  final List<String> _statusOptions = ['Sales', 'After Sales', 'Contingency'];
-  Map<String, List<String>> _statusWithLabels = {
+  StreamSubscription? _customSubscription;
+  List<String> _statusOptions = [];
+  Map<String, List<Map<String, dynamic>>> _statusWithLabels = {
     'Sales': [],
     'After Sales': [],
     'Contingency': [],
@@ -66,8 +68,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final org = userDoc.data()?['org'] ?? '';
 
       final customRef = FirebaseFirestore.instance
@@ -78,51 +79,58 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
           .collection('customisations')
           .doc('statuswithlabel');
 
-      final customDoc = await customRef.get();
+      _customSubscription?.cancel();
+      _customSubscription = customRef.snapshots().listen((snapshot) {
+        if (!snapshot.exists) {
+          // Set defaults if document doesn't exist
+          customRef.set({
+            'Sales': ["default"],
+            'After Sales': ["default"],
+            'Contingency': ["default"],
+          });
+          return;
+        }
 
-      if (!customDoc.exists) {
-        await customRef.set({
-          'sales': ["hot1", "cold1", "warm1"],
-          'aftersales': ["hot2", "cold2", "warm2"],
-          'contingency': ["hot3", "cold3", "warm3"],
+        final data = snapshot.data() ?? {};
+        setState(() {
+          _statusWithLabels = data.map((key, value) {
+            List<Map<String, dynamic>> list = List<dynamic>.from(value).map((e) {
+              if (e is String) {
+                return {"name": e, "hasDesc": false, "isMandatory": false};
+              }
+              return Map<String, dynamic>.from(e as Map);
+            }).toList();
+            return MapEntry(key, list);
+          });
+          _statusOptions = _statusWithLabels.keys.toList();
+
+          // Set initial status if not set
+          if (_selectedStatus == null && _statusOptions.isNotEmpty) {
+            _selectedStatus = _statusOptions.first;
+          }
+
+          // Ensure selected status still exists
+          if (_selectedStatus != null && !_statusOptions.contains(_selectedStatus)) {
+            _selectedStatus = _statusOptions.isNotEmpty ? _statusOptions.first : null;
+          }
+
+          // Handle labels for the current status
+          if (_selectedStatus != null) {
+            final labels = _statusWithLabels[_selectedStatus] ?? [];
+            if (_selectedLabel == null || !labels.any((e) => e['name'] == _selectedLabel)) {
+              _selectedLabel = labels.isNotEmpty ? labels.first['name'] : null;
+            }
+          }
         });
-      }
-
-      final data = (await customRef.get()).data() ?? {};
-
-      setState(() {
-        _statusWithLabels = {
-          'Sales': List<String>.from(data['sales'] ?? ['hot1', 'cold1', 'warm1'])
-              .where((e) => e != 'default')
-              .toList(),
-          'After Sales': List<String>.from(data['aftersales'] ?? ['hot2', 'cold2', 'warm2'])
-              .where((e) => e != 'default')
-              .toList(),
-          'Contingency': List<String>.from(data['contingency'] ?? ['hot3', 'cold3', 'warm3'])
-              .where((e) => e != 'default')
-              .toList(),
-        };
-
-        _selectedStatus = _selectedStatus ?? 'Sales';
-        final labels = _statusWithLabels[_selectedStatus] ?? ['default'];
-        _selectedLabel = _selectedLabel ?? (labels.isNotEmpty ? labels.first : 'default');
       });
     } catch (e) {
       debugPrint('initCustomisations error: $e');
-      setState(() {
-        _statusWithLabels = {
-          'Sales': ['hot1', 'cold1', 'warm1'],
-          'After Sales': ['hot2', 'cold2', 'warm2'],
-          'Contingency': ['hot3', 'cold3', 'warm3'],
-        };
-        _selectedStatus = _selectedStatus ?? 'Sales';
-        _selectedLabel = _selectedLabel ?? _statusWithLabels[_selectedStatus]!.first;
-      });
     }
   }
 
   @override
   void dispose() {
+    _customSubscription?.cancel();
     _nameC.dispose();
     _phoneC.dispose();
     _emailC.dispose();
@@ -130,6 +138,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     _followUpDescC.dispose();
     _clientNameC.dispose();
     _budgetC.dispose(); // Dispose budget controller
+    _labelDescC.dispose(); // NEW: label description controller
     super.dispose();
   }
 
@@ -241,6 +250,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
         'address': _addressC.text.trim(),
         'clientName': _clientNameC.text.trim(),
         'estimatedBudget': _budgetC.text.trim(), // NEW: save budget
+        'labelDescription': _labelDescC.text.trim(), // NEW: save label description
         'leadDate':
             _selectedDate != null ? Timestamp.fromDate(_selectedDate!) : null,
         'status': chosenStatus,
@@ -514,8 +524,9 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                     onChanged: (v) {
                       setState(() {
                         _selectedStatus = v;
-                        final options = _statusWithLabels[_selectedStatus] ?? ['default'];
-                        _selectedLabel = options.isNotEmpty ? options.first : 'default';
+                        final options = _statusWithLabels[_selectedStatus] ?? [];
+                        _selectedLabel = options.isNotEmpty ? options.first['name'] : 'default';
+                        _labelDescC.clear();
                       });
                     },
                     validator: (v) =>
@@ -527,11 +538,11 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                   _label('Label', required: true),
                   const SizedBox(height: 6),
                   Builder(builder: (context) {
-                    final options = _statusWithLabels[_selectedStatus] ?? ['default'];
-                    if ((_selectedLabel == null || !_selectedLabel!.isNotEmpty) && options.isNotEmpty) {
-                      _selectedLabel = options.first;
-                    } else if (!options.contains(_selectedLabel)) {
-                      _selectedLabel = options.isNotEmpty ? options.first : 'default';
+                    final options = _statusWithLabels[_selectedStatus] ?? [];
+                    if ((_selectedLabel == null || _selectedLabel!.isEmpty) && options.isNotEmpty) {
+                      _selectedLabel = options.first['name'];
+                    } else if (!options.any((e) => e['name'] == _selectedLabel)) {
+                      _selectedLabel = options.isNotEmpty ? options.first['name'] : 'default';
                     }
                     return DropdownButtonFormField<String>(
                       value: _selectedLabel,
@@ -544,16 +555,53 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                             borderRadius: BorderRadius.all(Radius.circular(12))),
                       ),
                       items: options
-                          .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                          .map((l) => DropdownMenuItem(value: l['name'].toString(), child: Text(l['name'].toString())))
                           .toList(),
                       onChanged: (v) {
                         setState(() {
                           _selectedLabel = v;
+                          _labelDescC.clear();
                         });
                       },
                       validator: (v) =>
                           v == null || v.isEmpty ? 'Please select label' : null,
                     );
+                  }),
+
+                  const SizedBox(height: 12),
+
+                  // Label Description Field (Conditional)
+                  Builder(builder: (context) {
+                    final options = _statusWithLabels[_selectedStatus] ?? [];
+                    final selectedConfig = options.firstWhere(
+                      (e) => e['name'] == _selectedLabel,
+                      orElse: () => {},
+                    );
+
+                    if (selectedConfig['hasDesc'] == true) {
+                      final isMandatory = selectedConfig['isMandatory'] == true;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label("Description for $_selectedLabel", required: isMandatory),
+                          const SizedBox(height: 6),
+                          _roundedInput(
+                            controller: _labelDescC,
+                            hint: "Enter details about this $_selectedLabel lead",
+                            textInputAction: TextInputAction.next,
+                            prefix: const Icon(Icons.description, color: Color(0xFF2E9AFF)),
+                            validator: (v) {
+                              if (isMandatory && (v == null || v.trim().isEmpty)) {
+                                return "Please enter description";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
                   }),
 
                   const SizedBox(height: 22),

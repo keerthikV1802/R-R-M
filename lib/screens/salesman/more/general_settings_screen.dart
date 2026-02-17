@@ -42,70 +42,85 @@ class GeneralSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Super admin account for Hh",
-              style: TextStyle(color: Colors.grey, fontSize: 14),
-            ),
-            const SizedBox(height: 5),
-            _settingsTile(
-              context,
-              icon: Icons.person_outline,
-              color: Colors.blue,
-              title: "My Profile",
-              subtitle: "Manage account information",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const UpdateProfileScreen(),
-                  ),
-                );
-              },
-            ),
-            _settingsTile(
-              context,
-              icon: Icons.business_outlined,
-              color: Colors.indigo,
-              title: "My Organisation",
-              subtitle: "Manage organisation info",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const OrganisationProfileScreen(),
-                  ),
-                );
-              },
-            ),
-            _settingsTile(
-              context,
-              icon: Icons.notifications_none_outlined,
-              color: Colors.cyan,
-              title: "Notifications",
-              subtitle: "Leads, Activities Notification",
-            ),
-            _settingsTile(
-              context,
-              icon: Icons.delete_outline,
-              color: Colors.redAccent,
-              title: "Delete My Account",
-              subtitle: "Permanently remove this account",
-            ),
-            ListTile(
-  leading: Icon(Icons.group, color: Colors.lightBlue),
-  title: const Text("Assign Team"),
-  subtitle: const Text("Assign level3 users to a level2 manager"),
-  onTap: () {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignLevelScreen()));
-  },
-),
-          ],
+      appBar: AppBar(
+        title: const Text("General Settings"),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 4.0, bottom: 8.0),
+                child: Text(
+                  "Super admin account for Hh",
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
+              _settingsTile(
+                context,
+                icon: Icons.person_outline,
+                color: Colors.blue,
+                title: "My Profile",
+                subtitle: "Manage account information",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const UpdateProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+              _settingsTile(
+                context,
+                icon: Icons.business_outlined,
+                color: Colors.indigo,
+                title: "My Organisation",
+                subtitle: "Manage organisation info",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrganisationProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+              _settingsTile(
+                context,
+                icon: Icons.notifications_none_outlined,
+                color: Colors.cyan,
+                title: "Notifications",
+                subtitle: "Leads, Activities Notification",
+              ),
+              _settingsTile(
+                context,
+                icon: Icons.delete_outline,
+                color: Colors.redAccent,
+                title: "Delete My Account",
+                subtitle: "Permanently remove this account",
+              ),
+              const SizedBox(height: 12),
+              _settingsTile(
+                context,
+                icon: Icons.group,
+                color: Colors.lightBlue,
+                title: "Assign Team",
+                subtitle: "Assign level3 users to a level2 manager",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AssignLevelScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

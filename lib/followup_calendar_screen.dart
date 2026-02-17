@@ -7,13 +7,14 @@ import 'package:restaurent_management/add_followup_screen.dart';
 import 'package:restaurent_management/screens/salesman/RestaurantDetailScreen.dart';
 
 class FollowUpCalendarScreen extends StatefulWidget {
-  const FollowUpCalendarScreen({super.key});
+  final GlobalKey<FollowUpCalendarScreenState>? stateKey;
+  const FollowUpCalendarScreen({super.key, this.stateKey});
 
   @override
-  State<FollowUpCalendarScreen> createState() => _FollowUpCalendarScreenState();
+  State<FollowUpCalendarScreen> createState() => FollowUpCalendarScreenState();
 }
 
-class _FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
+class FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
   DateTime _selectedDate = DateTime.now();
   DateTime _currentMonth = DateTime.now();
   DateTime _currentWeekStart = DateTime.now(); // Track current week
@@ -32,6 +33,13 @@ class _FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
 
   DateTime _getWeekStart(DateTime date) {
     return date.subtract(Duration(days: date.weekday % 7));
+  }
+
+  // Method to refresh data from outside
+  Future<void> refresh() async {
+    debugPrint('🔄 External refresh triggered');
+    await _fetchFollowUpCountsForMonth(_currentMonth);
+    await _fetchFollowUpsForDate(_selectedDate);
   }
 
   // Debug method to check Firestore data
@@ -239,77 +247,61 @@ class _FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
     final selectedDateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final followUpCount = _followUpCounts[selectedDateKey] ?? 0;
 
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text('Calendar'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              debugPrint('🔄 Manual refresh triggered');
-              await _debugFirestoreData();
-              await _fetchFollowUpCountsForMonth(_currentMonth);
-              _fetchFollowUpsForDate(_selectedDate);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Profile avatar section with follow-up count
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.grey,
-                      child: Icon(Icons.person, size: 40, color: Colors.white),
-                    ),
-                    if (followUpCount > 0)
-                      Positioned(
-                        right: -5,
-                        top: -5,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
-                          ),
-                          child: Center(
-                            child: Text(
-                              followUpCount > 99 ? '99+' : '$followUpCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+    return Column(
+      children: [
+        // Profile avatar section with follow-up count
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.grey,
+                        child: Icon(Icons.person, size: 25, color: Colors.white),
+                      ),
+                      if (followUpCount > 0)
+                        Positioned(
+                          right: -3,
+                          top: -3,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 20,
+                              minHeight: 20,
+                            ),
+                            child: Center(
+                              child: Text(
+                                followUpCount > 99 ? '99+' : '$followUpCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildCalendarHeader(),
-              ],
-            ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  _buildCalendarHeader(),
+                ],
+              ),
+            ],
           ),
+        ),
 
           // Week navigation controls - NEW
           Container(
@@ -356,8 +348,7 @@ class _FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildCalendarHeader() {
@@ -526,7 +517,7 @@ class _FollowUpCalendarScreenState extends State<FollowUpCalendarScreen> {
                 }
               },
               icon: const Icon(Icons.add),
-              label: const Text('+ Follow-up'),
+              label: const Text('Follow-up'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
