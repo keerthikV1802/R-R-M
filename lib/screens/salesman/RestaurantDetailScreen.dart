@@ -544,7 +544,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                             child: TabBarView(
                               children: [
                                 _timelineTab(createdAt, creatorInfo),
-                                const Center(child: Text("No tasks yet")),
+                                _tasksTab(),
                                 const Center(child: Text("No notes yet")),
                                 Padding(
                                   padding: const EdgeInsets.all(8.0),
@@ -645,34 +645,34 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               }
 
               final docs = snapshot.data!.docs;
-              return ListView.builder(
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final d = docs[index].data() as Map<String, dynamic>;
-                  final date = (d['followUpDate'] as Timestamp).toDate();
-                  final desc = d['description'] ?? '';
-                  final status = d['status'] ?? 'pending';
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    child: ListTile(
-                      leading: Icon(
-                        status == 'completed' ? Icons.check_circle : Icons.schedule,
-                        color: status == 'completed' ? Colors.green : Colors.orange,
-                      ),
-                      title: Text(DateFormat('MMM d, yyyy  hh:mm a').format(date)),
-                      subtitle: desc.isNotEmpty ? Text(desc) : null,
-                      trailing: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: status == 'completed' ? Colors.green : Colors.orange,
-                        ),
-                      ),
+              // Categorize follow-ups
+              final pendingDocs = docs.where((d) {
+                final s = (d.data() as Map<String, dynamic>)['status'] ?? 'pending';
+                return s == 'pending';
+              }).toList();
+              final completedDocs = docs.where((d) {
+                final s = (d.data() as Map<String, dynamic>)['status'] ?? 'pending';
+                return s == 'completed';
+              }).toList();
+
+              return ListView(
+                children: [
+                  if (pendingDocs.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Text('Pending', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange)),
                     ),
-                  );
-                },
+                    ...pendingDocs.map((doc) => _followUpCard(doc)),
+                  ],
+                  if (completedDocs.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Text('Completed', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                    ),
+                    ...completedDocs.map((doc) => _followUpCard(doc)),
+                  ],
+                ],
               );
             },
           ),
@@ -783,6 +783,168 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
           },
         );
       },
+    );
+  }
+
+  // ── Follow-up card (used by categorized display) ──
+  Widget _followUpCard(QueryDocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    final date = (d['followUpDate'] as Timestamp).toDate();
+    final desc = d['description'] ?? '';
+    final status = d['status'] ?? 'pending';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: ListTile(
+        leading: Icon(
+          status == 'completed' ? Icons.check_circle : Icons.schedule,
+          color: status == 'completed' ? Colors.green : Colors.orange,
+        ),
+        title: Text(DateFormat('MMM d, yyyy  hh:mm a').format(date)),
+        subtitle: desc.isNotEmpty ? Text(desc) : null,
+        trailing: Text(
+          status.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: status == 'completed' ? Colors.green : Colors.orange,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Tasks tab ──
+  Widget _tasksTab() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('restaurants')
+          .doc(widget.restaurantId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Center(child: Text('No data'));
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final List<dynamic> tasks = data['tasks'] ?? [];
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ElevatedButton.icon(
+                onPressed: () => _showAddTaskDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Task'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            if (tasks.isEmpty)
+              const Expanded(child: Center(child: Text('No tasks yet')))
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index] as Map<String, dynamic>;
+                    final title = task['title'] ?? '';
+                    final status = task['status'] ?? 'pending';
+                    final isDone = status == 'completed';
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: ListTile(
+                        leading: IconButton(
+                          icon: Icon(
+                            isDone ? Icons.check_circle : Icons.radio_button_unchecked,
+                            color: isDone ? Colors.green : Colors.grey,
+                          ),
+                          onPressed: () => _toggleTaskStatus(index, tasks),
+                        ),
+                        title: Text(
+                          title,
+                          style: TextStyle(
+                            decoration: isDone ? TextDecoration.lineThrough : null,
+                            color: isDone ? Colors.grey : Colors.black,
+                          ),
+                        ),
+                        trailing: Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isDone ? Colors.green : Colors.orange,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleTaskStatus(int index, List<dynamic> tasks) async {
+    final updated = List<dynamic>.from(tasks);
+    final task = Map<String, dynamic>.from(updated[index] as Map);
+    task['status'] = task['status'] == 'completed' ? 'pending' : 'completed';
+    updated[index] = task;
+
+    await FirebaseFirestore.instance
+        .collection('restaurants')
+        .doc(widget.restaurantId)
+        .update({'tasks': updated});
+  }
+
+  Future<void> _showAddTaskDialog() async {
+    final controller = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Task'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter task description',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+
+              await FirebaseFirestore.instance
+                  .collection('restaurants')
+                  .doc(widget.restaurantId)
+                  .update({
+                'tasks': FieldValue.arrayUnion([
+                  {'title': text, 'status': 'pending'}
+                ]),
+              });
+
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
     );
   }
 }

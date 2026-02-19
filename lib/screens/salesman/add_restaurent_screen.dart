@@ -22,6 +22,8 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   final TextEditingController _clientNameC = TextEditingController();
   final TextEditingController _budgetC = TextEditingController(); // NEW: budget controller
   final TextEditingController _labelDescC = TextEditingController(); // NEW: label description controller
+  final TextEditingController _taskC = TextEditingController(); // Task input controller
+  final List<String> _tasks = []; // List of tasks to save
 
   DateTime? _selectedDate;
   DateTime? _followUpDate;
@@ -139,6 +141,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     _clientNameC.dispose();
     _budgetC.dispose(); // Dispose budget controller
     _labelDescC.dispose(); // NEW: label description controller
+    _taskC.dispose();
     super.dispose();
   }
 
@@ -261,6 +264,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
         'createdByRole': creatorRole,
         'createdByEmail': user.email,
         'ownerLevel2': ownerLevel2 ?? null,
+        'tasks': _tasks.map((t) => {'title': t, 'status': 'pending'}).toList(),
         'isImported': false,
         'oldUid': '',
         'createdAt': FieldValue.serverTimestamp(),
@@ -603,6 +607,54 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                     }
                     return const SizedBox.shrink();
                   }),
+
+                  // Tasks section
+                  _label('Tasks'),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _roundedInput(
+                          controller: _taskC,
+                          hint: 'Add a task',
+                          textInputAction: TextInputAction.done,
+                          prefix: const Icon(Icons.task_alt, color: Color(0xFF2E9AFF)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          final text = _taskC.text.trim();
+                          if (text.isNotEmpty) {
+                            setState(() {
+                              _tasks.add(text);
+                              _taskC.clear();
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.add_circle, color: Color(0xFF2E9AFF), size: 36),
+                      ),
+                    ],
+                  ),
+                  if (_tasks.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ..._tasks.asMap().entries.map((entry) {
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        child: ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.circle, size: 8, color: Colors.blue),
+                          title: Text(entry.value),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                            onPressed: () {
+                              setState(() => _tasks.removeAt(entry.key));
+                            },
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
 
                   const SizedBox(height: 22),
 
