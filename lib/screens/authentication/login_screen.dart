@@ -31,26 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final user = await _auth.login(email, password);
       if (user != null) {
-        final profile = await _auth.getUserProfile(user.uid);
-
-        if (!mounted) return; // ✅ context-safe
-
-        if (profile != null) {
-          final role = profile['role'];
-          if (role == 'admin') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const SalesDashboardScreen()),
-            );
-          }
-        } else {
-          setState(() => _errorMessage = "Profile not found.");
-        }
+        // ✅ Don't navigate manually — AuthWrapper will detect
+        // the auth state change and route to the correct dashboard.
+        if (!mounted) return;
+        // AuthWrapper's StreamBuilder will rebuild automatically.
+        // No navigation needed here.
       }
     } catch (e) {
       if (!mounted) return;

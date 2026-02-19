@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:restaurent_management/RestaurantPaginatedListScreen.dart';
 import 'package:restaurent_management/followup_calendar_screen.dart';
-import 'package:restaurent_management/screens/authentication/login_screen.dart';
 import 'package:restaurent_management/screens/salesman/add_restaurent_screen.dart';
 import 'package:restaurent_management/screens/salesman/importCSVscreen.dart';
 import 'package:restaurent_management/screens/salesman/more_options_screen.dart';
@@ -67,11 +66,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
       final authService = AuthService();
       await authService.logout();
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+      // ✅ Pop back to AuthWrapper — it detects sign-out automatically
+      if (!context.mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

@@ -75,11 +75,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final authService = AuthService();
       await authService.logout();
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+      // ✅ Pop back to AuthWrapper — it detects sign-out automatically
+      if (!context.mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

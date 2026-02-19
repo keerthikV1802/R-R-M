@@ -75,14 +75,17 @@ class AuthWrapper extends StatelessWidget {
 // Explicitly cast after ensuring snap.data! isn’t null
 final doc = snap.data!;
 final data = doc.data() as Map<String, dynamic>? ?? {};
-final role = data['role'] ?? 'guest'; // default value if missing
+final role = data['role'] ?? '';
 
 if (role == 'admin') {
+  debugPrint("AuthWrapper: admin → AdminDashboard");
   return const AdminDashboardScreen();
-} else if (role == 'sales') {
+} else if (role.isNotEmpty) {
+  debugPrint("AuthWrapper: role '$role' → SalesDashboard");
   return const SalesDashboardScreen();
 } else {
-  return const LoginScreen(); // fallback for unknown role
+  debugPrint("AuthWrapper: empty role → LoginScreen");
+  return const LoginScreen();
 }
 
           },
