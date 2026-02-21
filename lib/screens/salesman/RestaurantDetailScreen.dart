@@ -133,6 +133,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
           minChildSize: 0.4,
           maxChildSize: 0.9,
           builder: (context, scrollController) {
+            final dynamicStatusOptions = statusWithLabels.keys.toList();
             return Column(
               children: [
                 const SizedBox(height: 12),
@@ -144,15 +145,16 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 Expanded(
                   child: ListView.builder(
                     controller: scrollController,
-                    itemCount: statusOptions.length,
+                    itemCount: dynamicStatusOptions.length,
                     itemBuilder: (context, index) {
-                      final s = statusOptions[index];
+                      final s = dynamicStatusOptions[index];
                       return ListTile(
-                        leading: CircleAvatar(backgroundColor: s['color']),
-                        title: Text(s['name']),
+                        leading: const CircleAvatar(backgroundColor: Colors.blue),
+                        title: Text(s),
                         onTap: () async {
-                          final newStatus = s['name'];
-                          final newLabels = statusLabelMap[newStatus] ?? [];
+                          final newStatus = s;
+                          final options = statusWithLabels[newStatus] ?? [];
+                          final newLabels = options.isNotEmpty ? [options.first['name']] : ["default"];
 
                           await FirebaseFirestore.instance
                               .collection('restaurants')
@@ -163,7 +165,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                             'updatedAt': FieldValue.serverTimestamp(),
                           });
 
-                          Navigator.pop(context);
                           Navigator.pop(context);
                         },
                       );
@@ -202,12 +203,12 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   const SizedBox(height: 20),
                   // STATUS
                   DropdownButtonFormField<String>(
-                    value: selectedStatus,
+                    value: statusWithLabels.keys.contains(selectedStatus) ? selectedStatus : (statusWithLabels.keys.isNotEmpty ? statusWithLabels.keys.first : "Sales"),
                     decoration: const InputDecoration(
                       labelText: "Status",
                       border: OutlineInputBorder(),
                     ),
-                    items: ["Sales", "After Sales", "Contingency"]
+                    items: (statusWithLabels.keys.isNotEmpty ? statusWithLabels.keys.toList() : ["Sales", "After Sales", "Contingency"])
                         .map((s) => DropdownMenuItem(
                               value: s,
                               child: Text(s),
@@ -237,7 +238,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       return Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: selectedLabel,
+                            value: options.any((l) => l['name'].toString() == selectedLabel) ? selectedLabel : (options.isNotEmpty ? options.first['name'].toString() : null),
                             decoration: const InputDecoration(
                               labelText: "Label",
                               border: OutlineInputBorder(),
@@ -248,7 +249,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                                 )).toList(),
                             onChanged: (v) {
                               setStateModal(() {
-                                selectedLabel = v ?? options.first['name'];
+                                selectedLabel = v ?? options.first['name'].toString();
                               });
                             },
                           ),
@@ -510,7 +511,33 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 34),
+                    if (labelDescription.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blueGrey.shade100),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.description, size: 16, color: Colors.blueGrey),
+                                SizedBox(width: 6),
+                                Text("Description", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(labelDescription, style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
